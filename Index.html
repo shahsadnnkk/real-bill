@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KDR Billing — Single File App</title>
+  <style>
+    :root{
+      --bg:#f6f8fb;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--line:#e5e7eb;
+      --pri:#6a82fb;--pri2:#a78bfa;--teal:#2dd4bf;--rose:#f43f5e;--green:#10b981;--amber:#f59e0b;
+      --radius:16px;--shadow:0 10px 30px rgba(2,6,23,.06);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);font-family:Segoe UI,system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink)}
+    a{color:inherit}
+    .appbar{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--pri),#75e3ea);color:#fff;box-shadow:var(--shadow)}
+    .appbar .inner{max-width:1200px;margin:auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .brand svg{height:40px}
+    .nav{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+    .chip{padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);cursor:pointer;border:1px solid rgba(255,255,255,.25)}
+    .chip.active{background:#fff;color:#0f172a}
+
+    .container{max-width:1200px;margin:18px auto;padding:0 16px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:980px){.grid.two{grid-template-columns:1.1fr 1fr}}
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card .head{padding:18px 18px 0}
+    .card .head h2{margin:0;font-size:18px}
+    .card .body{padding:18px}
+
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .stat{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px}
+    .stat .k{font-weight:800;font-size:20px}
+    .muted{color:var(--muted)}
+
+    label{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:#c7d2fe;box-shadow:0 0 0 4px rgba(106,130,251,.16)}
+    .row{display:grid;gap:12px}
+    @media(min-width:560px){.row.two{grid-template-columns:1fr 1fr};.row.three{grid-template-columns:repeat(3,1fr)}}
+
+    .btn{border:0;border-radius:12px;padding:10px 14px;cursor:pointer}
+    .btn.pri{background:var(--pri);color:#fff}
+    .btn.ghost{background:#eef4ff;color:#1f2937}
+    .btn.green{background:var(--green);color:#fff}
+    .btn.rose{background:var(--rose);color:#fff}
+    .btn.amber{background:var(--amber);color:#111827}
+
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:left;font-size:14px}
+    thead th{background:#e9f0ff;color:#1e3a8a;position:sticky;top:0}
+    tr:hover td{background:#fafcff}
+
+    .pill{padding:4px 10px;border-radius:999px;background:#f1f5f9;font-size:12px}
+    .badge{padding:4px 8px;border-radius:999px;font-size:12px;background:#fee2e2;color:#991b1b}
+
+    .hidden{display:none}
+
+    /* INVOICE PRINT THEME */
+    #printArea{background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:20px}
+    .inv-header{display:flex;gap:12px;align-items:center;border-bottom:1px dashed #e5e7eb;padding-bottom:12px;margin-bottom:12px}
+    .inv-brand{display:flex;gap:10px;align-items:center}
+    .inv-brand h1{margin:0;font-size:20px}
+    .inv-meta{margin-left:auto;text-align:right}
+    .inv-title{background:linear-gradient(135deg,var(--pri2),var(--pri));color:#fff;padding:8px 12px;border-radius:10px;display:inline-block}
+    .totals{margin-top:10px;padding:12px;background:#ecfdf5;border-radius:12px}
+    .grand{font-weight:800;font-size:20px;color:#065f46;background:#d1fae5;padding:8px 12px;border-radius:10px;text-align:right}
+
+    @media print{
+      body{background:#fff}
+      .appbar, .no-print{display:none !important}
+      #printArea{box-shadow:none;border-radius:0}
+    }
+
+    /* LOGIN */
+    #login{min-height:100vh;display:grid;place-items:center;background:radial-gradient(60% 60% at 20% 10%, #fde68a33 0, transparent 60%),radial-gradient(60% 60% at 80% 20%, #93c5fd33 0, transparent 60%), var(--bg)}
+    .login-card{max-width:420px;width:92%;padding:22px}
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <section id="login">
+    <div class="card login-card">
+      <div class="head" style="text-align:center">
+        <div class="brand" style="justify-content:center">
+          <!-- Inline RED Chef Hat + KDR -->
+          <svg viewBox="0 0 120 80" aria-label="KDR Chef Hat" role="img">
+            <g fill="#ef233c">
+              <path d="M37 33c-7 0-13-6-13-13s6-13 13-13c4 0 8 2 10 5c2-3 6-5 10-5c7 0 13 6 13 13c0 2-.5 4-1.3 6H37z"/>
+              <rect x="37" y="33" width="42" height="26" rx="6"/>
+              <rect x="42" y="44" width="32" height="6" rx="3" fill="#ff5b6b"/>
+              <text x="58" y="76" text-anchor="middle" font-size="22" font-weight="700" fill="#ef233c">KDR</text>
+            </g>
+          </svg>
+          <div>
+            <div style="font-size:20px;font-weight:800">KDR Billing</div>
+            <div class="muted">Modern Soft Theme • 🧾 Invoices • 📦 Stock • 👥 Customers</div>
+          </div>
+        </div>
+      </div>
+      <div class="body">
+        <form id="loginForm" class="row">
+          <div>
+            <label>👤 User ID</label>
+            <input id="loginUser" placeholder="admin" required />
+          </div>
+          <div>
+            <label>🔒 Password</label>
+            <input id="loginPass" type="password" placeholder="1234" required />
+          </div>
+          <div class="row two">
+            <button class="btn pri" type="submit">Login</button>
+            <button class="btn ghost" type="button" id="demoBtn">Use Demo</button>
+          </div>
+          <div class="muted" style="font-size:12px">Tip: default <b>admin / 1234</b> (can be changed in Settings)</div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP BAR -->
+  <div class="appbar hidden" id="appbar">
+    <div class="inner">
+      <div class="brand">
+        <!-- Small inline logo -->
+        <svg viewBox="0 0 120 80" width="42" aria-hidden="true">
+          <g fill="#ef233c">
+            <path d="M37 33c-7 0-13-6-13-13s6-13 13-13c4 0 8 2 10 5c2-3 6-5 10-5c7 0 13 6 13 13c0 2-.5 4-1.3 6H37z"/>
+            <rect x="37" y="33" width="42" height="26" rx="6"/>
+            <rect x="42" y="44" width="32" height="6" rx="3" fill="#ff5b6b"/>
+          </g>
+        </svg>
+        <div>KDR Billing</div>
+      </div>
+      <div class="nav" id="navTabs"></div>
+      <button class="btn rose" id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <main id="app" class="hidden">
+    <div class="container">
+      <!-- DASHBOARD -->
+      <section data-tab="dashboard">
+        <div class="stats">
+          <div class="stat"><div>💰 Today Sales</div><div class="k" id="statToday">₹0</div><div class="muted" id="statTodayCount">0 invoices</div></div>
+          <div class="stat"><div>📈 Monthly Sales</div><div class="k" id="statMonth">₹0</div></div>
+          <div class="stat"><div>🧾 Total Invoices</div><div class="k" id="statInvoices">0</div></div>
+          <div class="stat"><div>📦 Products</div><div class="k" id="statProducts">0</div></div>
+        </div>
+        <div class="grid two" style="margin-top:16px">
+          <div class="card">
+            <div class="head"><h2>🚀 Quick Actions</h2></div>
+            <div class="body" style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn pri" onclick="switchTab('billing')">➕ Create Bill</button>
+              <button class="btn amber" onclick="switchTab('stock')">📦 Manage Stock</button>
+              <button class="btn green" onclick="switchTab('customers')">👥 Add Customer</button>
+              <button class="btn ghost" onclick="switchTab('reports')">📊 View Reports</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="head"><h2>📰 Recent Invoices</h2></div>
+            <div class="body">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Total (₹)</th><th>Action</th></tr></thead>
+                  <tbody id="recentInvoices"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BILLING -->
+      <section data-tab="billing" class="hidden">
+        <div class="grid two">
+          <div class="card">
+            <div class="head"><h2>🧾 Create Invoice</h2></div>
+            <div class="body">
+              <form id="billForm" class="row">
+                <div class="row two">
+                  <div>
+                    <label>👤 Customer</label>
+                    <input id="bCustomer" list="customerList" placeholder="Type or select customer" required />
+                    <datalist id="customerList"></datalist>
+                  </div>
+                  <div>
+                    <label>📅 Date</label>
+                    <input id="bDate" type="date" required />
+                  </div>
+                </div>
+                <div>
+                  <label>🧺 Add Items</label>
+                  <div class="row two">
+                    <input id="itemSearch" placeholder="Search product (auto from stock)" list="stockList" />
+                    <input id="itemQty" type="number" min="0.01" step="0.01" placeholder="Qty" />
+                  </div>
+                  <datalist id="stockList"></datalist>
+                  <div style="margin-top:8px;display:flex;gap:8px">
+                    <button type="button" class="btn ghost" id="addItemBtn">➕ Add</button>
+                    <button type="button" class="btn amber" id="clearItemsBtn">🧹 Clear Items</button>
+                  </div>
+                </div>
+
+                <div class="table-wrap" style="margin-top:12px">
+                  <table>
+                    <thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Total</th><th>Action</th></tr></thead>
+                    <tbody id="billItems"></tbody>
+                  </table>
+                </div>
+
+                <div class="row three" style="margin-top:12px">
+                  <div>
+                    <label>🏷️ Discount (₹)</label>
+                    <input id="bDiscount" type="number" step="0.01" value="0" />
+                  </div>
+                  <div>
+                    <label>🧾 Tax %</label>
+                    <input id="bTax" type="number" step="0.01" value="5" />
+                  </div>
+                  <div>
+                    <label>🚚 Delivery Fee (₹)</label>
+                    <input id="bDelivery" type="number" step="0.01" value="0" />
+                  </div>
+                </div>
+
+                <div class="row two" style="margin-top:8px">
+                  <div class="pill">Subtotal: ₹<span id="bSub">0</span> • Tax: ₹<span id="bTaxAmt">0</span> • Discount: ₹<span id="bDiscAmt">0</span></div>
+                  <div class="pill" style="background:#ecfeff;color:#075985">Grand Total: ₹<b id="bGrand">0</b></div>
+                </div>
+
+                <div class="row two" style="margin-top:8px">
+                  <button class="btn pri" type="submit">✅ Save & Generate Bill</button>
+                  <button class="btn green" type="button" id="shareBtn">📲 WhatsApp / ✉️ Email</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="head"><h2>🧾 Preview (Modern Colorful Bill)</h2></div>
+            <div class="body">
+              <div id="printArea">
+                <div class="inv-header">
+                  <div class="inv-brand">
+                    <!-- Red Chef Hat + KDR for invoice -->
+                    <svg viewBox="0 0 120 80" width="64" aria-hidden="true">
+                      <g fill="#ef233c">
+                        <path d="M37 33c-7 0-13-6-13-13s6-13 13-13c4 0 8 2 10 5c2-3 6-5 10-5c7 0 13 6 13 13c0 2-.5 4-1.3 6H37z"/>
+                        <rect x="37" y="33" width="42" height="26" rx="6"/>
+                        <rect x="42" y="44" width="32" height="6" rx="3" fill="#ff5b6b"/>
+                        <text x="58" y="76" text-anchor="middle" font-size="18" font-weight="700">KDR</text>
+                      </g>
+                    </svg>
+                    <div>
+                      <div class="inv-title">Al Badariyya Catering Service</div>
+                      <div class="muted">📞 +91 8606221010 • Malappuram, Kerala</div>
+                    </div>
+                  </div>
+                  <div class="inv-meta">
+                    <div>Invoice <b>#<span id="pNo">—</span></b></div>
+                    <div>Date: <span id="pDate">—</span></div>
+                    <div>Customer: <b id="pCust">—</b></div>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead>
+                    <tbody id="pItems"></tbody>
+                  </table>
+                </div>
+                <div class="totals">
+                  <div>Subtotal: ₹<span id="pSub">0</span></div>
+                  <div>Tax (<span id="pTax">0</span>%) : ₹<span id="pTaxAmt">0</span></div>
+                  <div>Discount: ₹<span id="pDiscAmt">0</span></div>
+                  <div>Delivery: ₹<span id="pDel">0</span></div>
+                  <div class="grand">Grand Total: ₹<span id="pGrand">0</span></div>
+                </div>
+                <div class="muted" style="margin-top:8px">Thank you for choosing us! 🍽️</div>
+              </div>
+              <div class="no-print" style="margin-top:10px;display:flex;gap:8px">
+                <button class="btn pri" onclick="window.print()">🖨️ Print / Save PDF</button>
+                <button class="btn ghost" id="newBillBtn">🔄 New Bill</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="head"><h2>🔎 Search & Track Invoices</h2></div>
+          <div class="body">
+            <div class="row two">
+              <input id="searchInv" placeholder="Search by #, customer or date" />
+              <button class="btn ghost" id="refreshInv">⟳ Refresh</button>
+            </div>
+            <div class="table-wrap" style="margin-top:10px">
+              <table>
+                <thead><tr><th>#</th><th>Date</th><th>Customer</th><th>Total (₹)</th><th>Action</th></tr></thead>
+                <tbody id="invTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CUSTOMERS -->
+      <section data-tab="customers" class="hidden">
+        <div class="card">
+          <div class="head"><h2>👥 Customers</h2></div>
+          <div class="body">
+            <form id="custForm" class="row two">
+              <div>
+                <label>Name</label>
+                <input id="cName" required />
+              </div>
+              <div>
+                <label>Phone</label>
+                <input id="cPhone" />
+              </div>
+              <div>
+                <label>Email</label>
+                <input id="cEmail" type="email" />
+              </div>
+              <div>
+                <label>Address</label>
+                <input id="cAddr" />
+              </div>
+              <button class="btn pri" type="submit">➕ Add / Update</button>
+            </form>
+            <div class="table-wrap" style="margin-top:12px">
+              <table>
+                <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Action</th></tr></thead>
+                <tbody id="custTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- STOCK / INVENTORY -->
+      <section data-tab="stock" class="hidden">
+        <div class="grid two">
+          <div class="card">
+            <div class="head"><h2>📦 Product Editor</h2></div>
+            <div class="body">
+              <form id="prodForm" class="row">
+                <input type="hidden" id="prId" />
+                <div class="row two">
+                  <div><label>Name</label><input id="prName" required placeholder="Chicken Biryani (kg)"/></div>
+                  <div><label>SKU</label><input id="prSku" placeholder="CB-650"/></div>
+                </div>
+                <div class="row two">
+                  <div><label>Category</label><input id="prCat" placeholder="Biryani"/></div>
+                  <div><label>Unit</label>
+                    <select id="prUnit"><option>kg</option><option>plate</option><option>piece</option><option>pack</option></select>
+                  </div>
+                </div>
+                <div class="row two">
+                  <div><label>Cost Price (₹)</label><input id="prCost" type="number" step="0.01" /></div>
+                  <div><label>Selling Price (₹)</label><input id="prSell" type="number" step="0.01" required /></div>
+                </div>
+                <div class="row two">
+                  <div><label>Stock Qty</label><input id="prQty" type="number" step="0.01" required /></div>
+                  <div><label>Low Stock Alert</label><input id="prLow" type="number" step="0.01" /></div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn pri" type="submit" id="saveProdBtn">💾 Save Product</button>
+                  <button class="btn ghost" type="button" id="clearProdBtn">🧹 Clear</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="head"><h2>📋 Stock List</h2></div>
+            <div class="body">
+              <div class="row two">
+                <input id="prodSearch" placeholder="Search by name, sku, category"/>
+                <select id="catFilter"><option value="">All Categories</option></select>
+              </div>
+              <div class="table-wrap" style="margin-top:10px">
+                <table>
+                  <thead><tr><th>Name</th><th>SKU</th><th>Cat</th><th>Unit</th><th>Qty</th><th>Price</th><th>Value</th><th>Status</th><th>Action</th></tr></thead>
+                  <tbody id="prodTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EXPENSES -->
+      <section data-tab="expenses" class="hidden">
+        <div class="card">
+          <div class="head"><h2>💸 Expenses</h2></div>
+          <div class="body">
+            <form id="expForm" class="row two">
+              <div><label>Date</label><input id="eDate" type="date" required /></div>
+              <div><label>Category</label><input id="eCat" placeholder="Gas, Delivery, Salary" required /></div>
+              <div><label>Amount (₹)</label><input id="eAmt" type="number" step="0.01" required /></div>
+              <div><label>Note</label><input id="eNote" /></div>
+              <button class="btn pri" type="submit">Add Expense</button>
+            </form>
+            <div class="table-wrap" style="margin-top:10px">
+              <table>
+                <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Note</th><th>Action</th></tr></thead>
+                <tbody id="expTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section data-tab="reports" class="hidden">
+        <div class="card">
+          <div class="head"><h2>📊 Sales & Profit Reports</h2></div>
+          <div class="body">
+            <div class="row two">
+              <div><label>From</label><input id="rFrom" type="date"></div>
+              <div><label>To</label><input id="rTo" type="date"></div>
+            </div>
+            <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn ghost" id="rToday">Today</button>
+              <button class="btn ghost" id="rMonth">This Month</button>
+              <button class="btn pri" id="rRun">Run Report</button>
+            </div>
+            <div class="stats">
+              <div class="stat"><div>💵 Sales</div><div class="k" id="repSales">₹0</div></div>
+              <div class="stat"><div>💸 Expenses</div><div class="k" id="repExp">₹0</div></div>
+              <div class="stat"><div>📈 Profit</div><div class="k" id="repProfit">₹0</div></div>
+              <div class="stat"><div>🧾 Invoices</div><div class="k" id="repCount">0</div></div>
+            </div>
+            <canvas id="repChart" width="800" height="280" style="margin-top:14px;width:100%"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section data-tab="settings" class="hidden">
+        <div class="card">
+          <div class="head"><h2>⚙️ Settings</h2></div>
+          <div class="body row two">
+            <div>
+              <label>Business Name</label>
+              <input id="sBiz" placeholder="Al Badariyya Catering Service" />
+            </div>
+            <div>
+              <label>Phone</label>
+              <input id="sPhone" placeholder="+91 8606221010" />
+            </div>
+            <div>
+              <label>Address</label>
+              <input id="sAddr" placeholder="Malappuram, Kerala" />
+            </div>
+            <div>
+              <label>Default Tax %</label>
+              <input id="sTax" type="number" value="5" />
+            </div>
+            <div>
+              <label>Login User</label>
+              <input id="sUser" value="admin" />
+            </div>
+            <div>
+              <label>Login Password</label>
+              <input id="sPass" type="password" value="1234" />
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn pri" id="saveSettings">💾 Save</button>
+              <button class="btn rose" id="resetAll">🗑️ Factory Reset</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    /* ----------------------- UTIL & STORAGE ----------------------- */
+    const DB={key:'kdr_billing'};
+    function load(){try{return JSON.parse(localStorage.getItem(DB.key))||{products:[],customers:[],invoices:[],expenses:[],settings:{biz:'Al Badariyya Catering Service',phone:'+91 8606221010',addr:'Malappuram, Kerala',tax:5,user:'admin',pass:'1234'}}}catch(e){return {products:[],customers:[],invoices:[],expenses:[],settings:{biz:'Al Badariyya Catering Service',phone:'+91 8606221010',addr:'Malappuram, Kerala',tax:5,user:'admin',pass:'1234'}}}}
+    function save(data){localStorage.setItem(DB.key,JSON.stringify(data));}
+    let state = load();
+    const $ = (q)=>document.querySelector(q);
+    const $$ = (q)=>document.querySelectorAll(q);
+    function money(n){return Number(n||0).toLocaleString('en-IN');}
+    function today(){const d=new Date();return d.toISOString().slice(0,10)}
+    function between(d,from,to){const t=(x)=>new Date(x+'T00:00:00');return (!from||t(d)>=t(from)) && (!to||t(d)<=t(to));}
+
+    /* ----------------------- LOGIN ----------------------- */
+    const loginSec=$('#login'), app=$('#app'), appbar=$('#appbar');
+    const loginForm=$('#loginForm');
+    loginForm.addEventListener('submit',e=>{e.preventDefault();
+      const u=$('#loginUser').value.trim(); const p=$('#loginPass').value;
+      if(u===state.settings.user && p===state.settings.pass){loginSec.classList.add('hidden'); app.classList.remove('hidden'); appbar.classList.remove('hidden'); initApp();}
+      else alert('Wrong ID or password');
+    });
+    $('#demoBtn').onclick=()=>{ $('#loginUser').value=state.settings.user; $('#loginPass').value=state.settings.pass; };
+
+    /* ----------------------- NAV ----------------------- */
+    const tabs=['dashboard','billing','customers','stock','expenses','reports','settings'];
+    const nav=$('#navTabs');
+    nav.innerHTML=tabs.map(t=>`<div class="chip" data-goto="${t}">${icon(t)} ${cap(t)}</div>`).join('');
+    nav.addEventListener('click',e=>{const el=e.target.closest('.chip'); if(!el) return; switchTab(el.dataset.goto)});
+    function switchTab(t){$$('section[data-tab]').forEach(s=>s.classList.toggle('hidden', s.getAttribute('data-tab')!==t));
+      $$('.chip').forEach(c=>c.classList.toggle('active', c.dataset.goto===t));
+      if(t==='dashboard') renderDashboard();
+      if(t==='billing') refreshBillingLists();
+      if(t==='customers') renderCustomers();
+      if(t==='stock') renderProducts();
+      if(t==='expenses') renderExpenses();
+      if(t==='reports') runReportRange();
+    }
+    function cap(s){return s[0].toUpperCase()+s.slice(1)}
+    function icon(t){return {dashboard:'🏠',billing:'🧾',customers:'👥',stock:'📦',expenses:'💸',reports:'📊',settings:'⚙️'}[t]||'•'}
+    $('#logoutBtn').onclick=()=>{location.reload()};
+
+    /* ----------------------- SETTINGS ----------------------- */
+    function bindSettings(){ $('#sBiz').value=state.settings.biz; $('#sPhone').value=state.settings.phone; $('#sAddr').value=state.settings.addr; $('#sTax').value=state.settings.tax; $('#sUser').value=state.settings.user; $('#sPass').value=state.settings.pass; }
+    $('#saveSettings').onclick=()=>{ state.settings={biz:$('#sBiz').value,phone:$('#sPhone').value,addr:$('#sAddr').value,tax:Number($('#sTax').value||0),user:$('#sUser').value,pass:$('#sPass').value}; save(state); alert('Saved ✅'); };
+    $('#resetAll').onclick=()=>{ if(confirm('This will delete all data. Continue?')){ localStorage.removeItem(DB.key); location.reload(); } };
+
+    /* ----------------------- DASHBOARD ----------------------- */
+    function renderDashboard(){ const d=today(); const todayInv=state.invoices.filter(i=>i.date===d); const monthKey=(x)=>x.slice(0,7); const m=monthKey(d); const monthInv=state.invoices.filter(i=>i.date.slice(0,7)===m);
+      $('#statToday').textContent='₹'+money(sum(todayInv.map(i=>i.grand)));
+      $('#statTodayCount').textContent=todayInv.length+' invoices';
+      $('#statMonth').textContent='₹'+money(sum(monthInv.map(i=>i.grand)));
+      $('#statInvoices').textContent=state.invoices.length;
+      $('#statProducts').textContent=state.products.length;
+      // recent
+      const recent=[...state.invoices].slice(-5).reverse();
+      $('#recentInvoices').innerHTML = recent.map(i=>`<tr><td>${i.no}</td><td>${i.date}</td><td>${escape(i.customer)}</td><td>${money(i.grand)}</td><td><button class='btn ghost' onclick='viewInvoice(${i.no})'>View</button></td></tr>`).join('') || `<tr><td colspan='5' class='muted'>No invoices yet</td></tr>`;
+    }
+
+    /* ----------------------- CUSTOMERS ----------------------- */
+    const custForm=$('#custForm');
+    custForm.addEventListener('submit',e=>{e.preventDefault();
+      const name=$('#cName').value.trim(); if(!name) return;
+      const ex=state.customers.find(c=>c.name.toLowerCase()===name.toLowerCase());
+      const obj={name,phone:$('#cPhone').value,email:$('#cEmail').value,addr:$('#cAddr').value};
+      if(ex){Object.assign(ex,obj)} else {state.customers.push(obj)}
+      save(state); custForm.reset(); renderCustomers(); refreshBillingLists(); alert('Customer saved ✅');
+    });
+    function renderCustomers(){ $('#custTable').innerHTML= state.customers.map((c,idx)=>`<tr><td>${escape(c.name)}</td><td>${escape(c.phone||'')}</td><td>${escape(c.email||'')}</td><td><button class='btn amber' onclick='fillCust(${idx})'>Use in Bill</button> <button class='btn rose' onclick='delCustomer(${idx})'>Delete</button></td></tr>`).join('') || `<tr><td colspan='4' class='muted'>No customers</td></tr>`; }
+    window.fillCust=(i)=>{ const c=state.customers[i]; switchTab('billing'); $('#bCustomer').value=c.name; };
+    window.delCustomer=(i)=>{ if(confirm('Delete this customer?')){ state.customers.splice(i,1); save(state); renderCustomers(); refreshBillingLists(); }}
+
+    /* ----------------------- PRODUCTS / STOCK ----------------------- */
+    const prodForm=$('#prodForm');
+    prodForm.addEventListener('submit',e=>{e.preventDefault(); const id=$('#prId').value; const p={id:id?Number(id):Date.now(),name:$('#prName').value,sku:$('#prSku').value,category:$('#prCat').value,unit:$('#prUnit').value,cost:Number($('#prCost').value||0),price:Number($('#prSell').value||0),qty:Number($('#prQty').value||0),low:Number($('#prLow').value||0)}; const idx=state.products.findIndex(x=>x.id===p.id); if(idx>-1) state.products[idx]=p; else state.products.push(p); save(state); prodForm.reset(); $('#prId').value=''; $('#saveProdBtn').textContent='💾 Save Product'; renderProducts(); refreshBillingLists(); alert('Product saved ✅'); });
+    $('#clearProdBtn').onclick=()=>{prodForm.reset(); $('#prId').value=''; $('#saveProdBtn').textContent='💾 Save Product'};
+    function renderProducts(){ const q=$('#prodSearch').value?.toLowerCase()||''; const cat=$('#catFilter').value||''; const list=state.products.filter(p=> (p.name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q)).filter(p=>!cat || p.category===cat);
+      const cats=[...new Set(state.products.map(p=>p.category).filter(Boolean))]; $('#catFilter').innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option>${escape(c)}</option>`).join('');
+      $('#prodTable').innerHTML=list.map(p=>{const low=(p.qty||0)<= (p.low||0); const value=Math.round((p.qty||0)*(p.cost||p.price||0)); return `<tr><td>${escape(p.name)}</td><td>${escape(p.sku||'')}</td><td>${escape(p.category||'')}</td><td>${escape(p.unit||'')}</td><td>${p.qty}</td><td>₹ ${p.price}</td><td>₹ ${money(value)}</td><td>${low?'<span class="badge">Low</span>':'<span class="pill">OK</span>'}</td><td><button class='btn ghost' onclick='editProd(${p.id})'>Edit</button> <button class='btn rose' onclick='delProd(${p.id})'>Delete</button></td></tr>`}).join('') || `<tr><td colspan='9' class='muted'>No products</td></tr>`; }
+    $('#prodSearch').oninput=renderProducts; $('#catFilter').onchange=renderProducts;
+    window.editProd=(id)=>{const p=state.products.find(x=>x.id===id); if(!p) return; $('#prId').value=p.id; $('#prName').value=p.name; $('#prSku').value=p.sku||''; $('#prCat').value=p.category||''; $('#prUnit').value=p.unit||'kg'; $('#prCost').value=p.cost||''; $('#prSell').value=p.price||''; $('#prQty').value=p.qty||''; $('#prLow').value=p.low||''; $('#saveProdBtn').textContent='🔁 Update Product'; window.scrollTo({top:0,behavior:'smooth'}); };
+    window.delProd=(id)=>{ if(confirm('Delete this product?')){ state.products = state.products.filter(p=>p.id!==id); save(state); renderProducts(); refreshBillingLists(); } };
+
+    /* ----------------------- BILLING LOGIC ----------------------- */
+    const billForm=$('#billForm'); const itemsBody=$('#billItems'); const pItems=$('#pItems');
+    let currentItems=[]; // {id,name,qty,rate,total}
+
+    function refreshBillingLists(){ // customers + stock datalists
+      $('#customerList').innerHTML = state.customers.map(c=>`<option value='${escape(c.name)}'>`).join('');
+      $('#stockList').innerHTML = state.products.map(p=>`<option value='${escape(p.name)}'>`).join('');
+      if(!$('#bDate').value) $('#bDate').value=today();
+      if(!$('#bTax').value) $('#bTax').value=state.settings.tax||0;
+      calcTotals();
+    }
+
+    $('#addItemBtn').onclick=()=>{ const name=$('#itemSearch').value.trim(); const qty=Number($('#itemQty').value||0); if(!name || !qty) return alert('Select item and quantity'); const prod=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase()); if(!prod){return alert('Item not found in stock');} if(prod.qty < qty) return alert('Not enough stock'); const ex=currentItems.find(i=>i.id===prod.id); if(ex){ex.qty+=qty; ex.total=round2(ex.qty*ex.rate);} else {currentItems.push({id:prod.id,name:prod.name,qty,rate:prod.price,total:round2(qty*prod.price)})} $('#itemSearch').value=''; $('#itemQty').value=''; renderBillItems(); };
+    $('#clearItemsBtn').onclick=()=>{ if(confirm('Clear all items?')){ currentItems=[]; renderBillItems(); }};
+
+    function renderBillItems(){ itemsBody.innerHTML = currentItems.map((i,idx)=>`<tr><td>${escape(i.name)}</td><td><input type='number' min='0.01' step='0.01' value='${i.qty}' style='width:90px' onchange='updQty(${idx}, this.value)'/></td><td>₹ ${i.rate}</td><td>₹ ${money(i.total)}</td><td><button class='btn rose' onclick='remItem(${idx})'>Delete</button></td></tr>`).join('') || `<tr><td colspan='5' class='muted'>No items added</td></tr>`; calcTotals(); }
+    window.updQty=(idx,val)=>{ const q=Number(val||0); if(q<=0) return; const i=currentItems[idx]; const prod=state.products.find(p=>p.id===i.id); if(prod && q>prod.qty) {alert('Not enough stock'); return renderBillItems();} i.qty=q; i.total=round2(q*i.rate); renderBillItems(); };
+    window.remItem=(idx)=>{ currentItems.splice(idx,1); renderBillItems(); };
+
+    ['bDiscount','bTax','bDelivery'].forEach(id=>{ $('#'+id).oninput=calcTotals });
+
+    function calcTotals(){ const sub=round2(currentItems.reduce((a,b)=>a+b.total,0)); const disc=round2(Number($('#bDiscount').value||0)); const taxp=Number($('#bTax').value||0); const taxAmt=round2(((sub-disc)*taxp)/100); const del=round2(Number($('#bDelivery').value||0)); const grand=round2(sub - disc + taxAmt + del); $('#bSub').textContent=money(sub); $('#bTaxAmt').textContent=money(taxAmt); $('#bDiscAmt').textContent=money(disc); $('#bGrand').textContent=money(grand);
+      // preview
+      $('#pSub').textContent=money(sub); $('#pTax').textContent=taxp; $('#pTaxAmt').textContent=money(taxAmt); $('#pDel').textContent=money(del); $('#pGrand').textContent=money(grand); $('#pCust').textContent=$('#bCustomer').value||'—'; $('#pDate').textContent=$('#bDate').value||today(); pItems.innerHTML=currentItems.map(i=>`<tr><td>${escape(i.name)}</td><td>${i.qty}</td><td>₹ ${i.rate}</td><td>₹ ${money(i.total)}</td></tr>`).join(''); }
+
+    billForm.addEventListener('submit',e=>{e.preventDefault(); if(currentItems.length===0) return alert('Add at least one item'); const no = (state.invoices.at(-1)?.no || 1000)+1; const sub=Number($('#bSub').textContent.replace(/,/g,'')); const taxAmt=Number($('#bTaxAmt').textContent.replace(/,/g,'')); const del=Number($('#pDel').textContent.replace(/,/g,'')); const disc=Number($('#bDiscAmt').textContent.replace(/,/g,'')); const grand=Number($('#pGrand').textContent.replace(/,/g,'')); const inv={no,date:$('#bDate').value,customer:$('#bCustomer').value,items:currentItems.map(x=>({...x})),sub,disc,tax:$('#bTax').value,taxAmt,delivery:del,grand}; state.invoices.push(inv); // deduct stock
+      currentItems.forEach(i=>{ const p=state.products.find(x=>x.id===i.id); if(p) p.qty = round2((p.qty||0) - i.qty); });
+      save(state); $('#pNo').textContent=no; alert('Invoice saved ✅'); renderProducts(); renderInvoices(); renderDashboard(); });
+
+    $('#newBillBtn').onclick=()=>{ billForm.reset(); currentItems=[]; $('#bDate').value=today(); $('#bTax').value=state.settings.tax||0; renderBillItems(); };
+
+    // Share invoice via WA/Email
+    $('#shareBtn').onclick=()=>{ const no=$('#pNo').textContent || '(Draft)'; const cust=$('#pCust').textContent||''; const grand=$('#pGrand').textContent; const lines=currentItems.map(i=>`${i.name} x${i.qty} = ₹${i.total}`).join('%0A'); const text=encodeURIComponent(`Invoice #${no}\nCustomer: ${cust}\n${lines}\nGrand Total: ₹${grand}`); const wa=`https://wa.me/?text=${text}`; const mail=`mailto:?subject=${encodeURIComponent('Invoice #'+no)}&body=${text}`; const win=window.open(wa,'_blank'); setTimeout(()=>window.open(mail,'_blank'),500); };
+
+    function viewInvoice(no){ switchTab('billing'); const inv=state.invoices.find(i=>i.no===no); if(!inv) return; // load into preview
+      $('#pNo').textContent=inv.no; $('#pDate').textContent=inv.date; $('#pCust').textContent=inv.customer; pItems.innerHTML=inv.items.map(i=>`<tr><td>${escape(i.name)}</td><td>${i.qty}</td><td>₹ ${i.rate}</td><td>₹ ${money(i.total)}</td></tr>`).join(''); $('#pSub').textContent=money(inv.sub); $('#pTax').textContent=inv.tax; $('#pTaxAmt').textContent=money(inv.taxAmt); $('#pDel').textContent=money(inv.delivery); $('#pGrand').textContent=money(inv.grand); }
+
+    /* ----------------------- INVOICE TABLE ----------------------- */
+    function renderInvoices(){ const q=$('#searchInv').value?.toLowerCase()||''; const list=state.invoices.filter(i=> (String(i.no).includes(q) || (i.customer||'').toLowerCase().includes(q) || (i.date||'').includes(q))).slice().reverse(); $('#invTable').innerHTML=list.map(i=>`<tr><td>${i.no}</td><td>${i.date}</td><td>${escape(i.customer)}</td><td>${money(i.grand)}</td><td><button class='btn ghost' onclick='viewInvoice(${i.no})'>View</button></td></tr>`).join('') || `<tr><td colspan='5' class='muted'>No invoices</td></tr>`; }
+    $('#searchInv').oninput=renderInvoices; $('#refreshInv').onclick=renderInvoices;
+
+    /* ----------------------- EXPENSES ----------------------- */
+    const expForm=$('#expForm'); expForm.addEventListener('submit',e=>{e.preventDefault(); const it={id:Date.now(),date:$('#eDate').value||today(),cat:$('#eCat').value,amt:Number($('#eAmt').value||0),note:$('#eNote').value}; state.expenses.push(it); save(state); expForm.reset(); renderExpenses(); alert('Expense added ✅');});
+    function renderExpenses(){ $('#expTable').innerHTML= state.expenses.slice().reverse().map(e=>`<tr><td>${e.date}</td><td>${escape(e.cat)}</td><td>₹ ${money(e.amt)}</td><td>${escape(e.note||'')}</td><td><button class='btn rose' onclick='delExp(${e.id})'>Delete</button></td></tr>`).join('') || `<tr><td colspan='5' class='muted'>No expenses</td></tr>` }
+    window.delExp=(id)=>{ if(confirm('Delete this expense?')){ state.expenses = state.expenses.filter(e=>e.id!==id); save(state); renderExpenses(); runReportRange(); }}
+
+    /* ----------------------- REPORTS ----------------------- */
+    function runReport(from,to){ const inv=state.invoices.filter(i=>between(i.date,from,to)); const sales=sum(inv.map(i=>i.grand)); const count=inv.length; const exp=sum(state.expenses.filter(e=>between(e.date,from,to)).map(e=>e.amt)); const profit=sales-exp; $('#repSales').textContent='₹'+money(sales); $('#repExp').textContent='₹'+money(exp); $('#repProfit').textContent='₹'+money(profit); $('#repCount').textContent=count; drawChart(inv, from, to); }
+    function runReportRange(){ const f=$('#rFrom').value, t=$('#rTo').value; runReport(f,t); }
+    $('#rRun').onclick=(e)=>{e.preventDefault(); runReportRange();};
+    $('#rToday').onclick=(e)=>{e.preventDefault(); const d=today(); $('#rFrom').value=d; $('#rTo').value=d; runReportRange(); };
+    $('#rMonth').onclick=(e)=>{e.preventDefault(); const d=new Date(); const f=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; const t=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(new Date(d.getFullYear(),d.getMonth()+1,0).getDate()).padStart(2,'0')}`; $('#rFrom').value=f; $('#rTo').value=t; runReportRange(); };
+
+    function drawChart(inv,from,to){ const c=$('#repChart'); const ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); // simple bar chart by day
+      const map={}; inv.forEach(i=>{map[i.date]=(map[i.date]||0)+i.grand}); const keys=Object.keys(map).sort(); const max=Math.max(10,...Object.values(map)); const pad=40; const W=c.width,H=c.height; const bars=keys.length||1; const barW=(W-pad*2)/bars*0.7; ctx.font='12px Segoe UI'; ctx.textAlign='center';
+      keys.forEach((d,idx)=>{ const x=pad + idx*((W-pad*2)/bars) + ((W-pad*2)/bars - barW)/2; const h=(H-pad*2)*(map[d]/max); const y=H-pad - h; ctx.fillRect(x,y,barW,h); ctx.fillText(d, x+barW/2, H-20); ctx.fillText('₹'+money(Math.round(map[d])), x+barW/2, y-5); });
+      // axes
+      ctx.beginPath(); ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.stroke();
+    }
+
+    /* ----------------------- HELPERS ----------------------- */
+    function sum(arr){return Math.round(arr.reduce((a,b)=>a+Number(b||0),0))}
+    function round2(n){return Math.round(n*100)/100}
+    function escape(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))}
+
+    /* ----------------------- INIT ----------------------- */
+    function initApp(){ bindSettings(); switchTab('dashboard'); renderDashboard(); renderInvoices(); renderProducts(); renderCustomers(); renderExpenses(); refreshBillingLists(); $('#eDate').value=today(); }
+
+    // Seed sample data on first run
+    if(state.products.length===0 && state.invoices.length===0){
+      state.products=[
+        {id:1,name:'Chicken Biryani',sku:'CB-650',category:'Biryani',unit:'kg',cost:450,price:650,qty:12,low:3},
+        {id:2,name:'Mutton Biryani',sku:'MB-900',category:'Biryani',unit:'kg',cost:650,price:900,qty:6,low:2},
+        {id:3,name:'Water Bottle',sku:'WB-20',category:'Drinks',unit:'piece',cost:10,price:20,qty:80,low:15}
+      ];
+      state.customers=[{name:'Rahman',phone:'99999 88888',email:'rahman@example.com',addr:'Manjeri'},{name:'Aisha',phone:'98888 77777',email:'aisha@example.com',addr:'Kavanoor'}];
+      save(state);
+    }
+  </script>
+</body>
+</html>
